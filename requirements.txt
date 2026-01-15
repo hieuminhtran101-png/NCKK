@@ -1,0 +1,40 @@
+# FastAPI Books - Core Dependencies
+# Generated: January 15, 2026
+# Essential packages only (removed dev dependencies, ML libs, etc.)
+
+# Web Framework & ASGI
+fastapi==0.109.0
+uvicorn==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Database & ORM
+pymongo==4.6.0
+motor==3.3.2
+
+# Caching
+redis==5.0.1
+
+# Authentication & Security
+PyJWT==2.8.1
+bcrypt==4.1.1
+cryptography==42.0.0
+python-multipart==0.0.6
+
+# Background Jobs & Scheduling
+APScheduler==3.11.2
+
+# HTTP Client & Requests
+httpx==0.25.2
+requests==2.31.0
+
+# Environment Variables
+python-dotenv==1.0.0
+
+# Utilities & Data Handling
+python-dateutil==2.8.2
+certifi==2025.1.31
+
+# Testing (Development Only)
+pytest==7.4.3
+pytest-asyncio==0.21.1
