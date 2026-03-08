@@ -1,30 +1,14 @@
-# ===== Python / FastAPI =====
-venv/
-.env
+# Python
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-.pytest_cache/
-.mypy_cache/
 
-# ===== Node / React =====
-node_modules/
-npm-debug.log*
-yarn-error.log*
-dist/
-build/
+# Virtual env
+.venv
+venv
 
-# ===== BMAD / AI tools =====
-_bmad-output/
-_bmad/cache/
-*.prompt.md
+# Environment variables
+.env
 
-# ===== OS / Editor =====
+# IDE
 .vscode/
 .idea/
-.DS_Store
-Thumbs.db
-
-# ===== Logs =====
-*.log
