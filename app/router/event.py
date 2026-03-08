@@ -10,7 +10,7 @@ from app.service.event_service import (
 )
 
 router = APIRouter(
-    prefix="/events",
+    prefix="/api/events",
     tags=["events"]
 )
 
