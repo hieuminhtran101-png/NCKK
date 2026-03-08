@@ -1,4 +1,6 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
 from app.router import auth, event, telegram
 from app.bot.telegram_bot import build_bot
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -6,6 +8,16 @@ from app.service.notification_service import send_upcoming_reminders
 import asyncio
 
 app = FastAPI()
+# ✅ CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",   # frontend dev
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 scheduler = AsyncIOScheduler()
 telegram_app = build_bot()  # ✅ khởi tạo bên ngoài startup
 
