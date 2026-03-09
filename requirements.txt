@@ -10,3 +10,4 @@ google-genai==1.66.0
 httpx==0.28.1
 pydantic==2.12.5
 email-validator==2.3.0
+APScheduler==3.10.4
