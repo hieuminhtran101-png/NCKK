@@ -1,3 +1,4 @@
+#app/bot/telegram_bot.py
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from app.service.telegram_service import link_telegram  # ✅ gọi service
