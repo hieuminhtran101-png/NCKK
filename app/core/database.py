@@ -12,6 +12,8 @@ db = client["student_app"]
 
 event_collection = db["events"]
 user_collection = db["users"]
+course_collection = db["courses"]          # ✅ thêm
+student_course_collection = db["student_courses"]  # ✅ thêm
 
 print("MONGO_URI:", MONGO_URI)
 print("DB NAME:", db.name)
