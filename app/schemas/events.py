@@ -1,16 +1,16 @@
 # app/schemas/events.py
 from pydantic import BaseModel
 from datetime import date
-from typing import Optional
+from typing import Optional, List
 from enum import Enum
 
 
 class EventType(str, Enum):
-    buoi_hoc  = "buoi_hoc"   # 📚 Lịch học thường
-    thi       = "thi"        # 📝 Thi giữa kỳ / cuối kỳ
-    deadline  = "deadline"   # ⏰ Nộp báo cáo / bài tập
-    hop_nhom  = "hop_nhom"   # 👥 Họp nhóm / meeting
-    su_kien   = "su_kien"    # 🎉 Sự kiện trường
+    buoi_hoc = "buoi_hoc"
+    thi      = "thi"
+    deadline = "deadline"
+    hop_nhom = "hop_nhom"
+    su_kien  = "su_kien"
 
 
 class EventCreate(BaseModel):
@@ -23,7 +23,9 @@ class EventCreate(BaseModel):
     period_end:   int
     start_date:   date
     end_date:     date
-    event_type:   EventType = EventType.buoi_hoc  # ✅ mặc định là buổi học
+    event_type:   EventType       = EventType.buoi_hoc
+    skip_dates:   List[date]      = []   # ngày nghỉ bất thường
+    extra_dates:  List[date]      = []   # ngày học bù
 
 
 class EventBulkCreate(BaseModel):
@@ -40,4 +42,14 @@ class EventUpdate(BaseModel):
     period_end:   Optional[int]       = None
     start_date:   Optional[date]      = None
     end_date:     Optional[date]      = None
-    event_type:   Optional[EventType] = None  # ✅ có thể update type
+    event_type:   Optional[EventType] = None
+    skip_dates:   Optional[List[date]] = None   # ghi đè toàn bộ danh sách
+    extra_dates:  Optional[List[date]] = None
+
+
+# ── Thêm / bớt 1 ngày riêng lẻ (thay vì ghi đè cả list) ──────────
+class EventAddSkip(BaseModel):
+    skip_date: date    # ngày cần nghỉ
+
+class EventAddExtra(BaseModel):
+    extra_date: date   # ngày học bù

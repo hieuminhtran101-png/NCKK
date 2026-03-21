@@ -75,6 +75,8 @@ Nhiệm vụ: phân tích tin nhắn → trả về JSON duy nhất. KHÔNG mark
 - "create_event"  → thêm lịch
 - "update_event"  → sửa lịch (cần event_id)
 - "delete_event"  → xóa lịch (cần event_id)
+- "add_skip_date"   → thêm ngày nghỉ bất thường   
+- "add_extra_date"  → thêm ngày học bù    
 
 [QUERY SỰ KIỆN]
 - "get_events_by_date"         → hôm nay / ngày mai / ngày X
@@ -103,6 +105,8 @@ create_event:
 
 update_event:   {{ "event_id": "...", ...fields... }}
 delete_event:   {{ "event_id": "..." }}
+add_skip_date:  {{ "event_id": "...", "skip_date": "YYYY-MM-DD" }}
+add_extra_date: {{ "event_id": "...", "extra_date": "YYYY-MM-DD" }}
 get_events_by_date:        {{ "date": "YYYY-MM-DD" }}
 get_events_by_range:       {{ "start_date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD" }}
 get_events_by_day_of_week: {{ "day_of_week": "T2|T3|..." }}
@@ -120,6 +124,30 @@ get_events:                {{}}
 - "ngày kia" → {day_after.isoformat()}
 - "tuần này" → {week_start.isoformat()} → {week_end.isoformat()}
 - "tuần sau" → {next_week_start.isoformat()} → {next_week_end.isoformat()}
+
+=== MULTI ACTION (khi cần làm 2 việc cùng lúc) ===
+ 
+Thay vì trả về 1 action, trả về mảng "actions":
+ 
+{
+  "actions": [
+    { "action": "add_skip_date",  "params": { "event_id": "...", "skip_date": "YYYY-MM-DD" } },
+    { "action": "add_extra_date", "params": { "event_id": "...", "extra_date": "YYYY-MM-DD" } }
+  ],
+  "reply": "Đã ghi nhận nghỉ T2 và học bù T4 tuần này!"
+}
+ 
+DÙNG KHI:
+- SV nói "thầy dời lịch T2 sang T4"
+  → skip T2 + extra T4 cùng lúc
+ 
+- SV nói "tuần này nghỉ T2, học bù T4"
+  → skip T2 + extra T4 cùng lúc
+ 
+KHÔNG dùng khi:
+- SV chỉ nói "thầy báo nghỉ T2 tuần này" mà không đề cập bù
+  → action="answer", hỏi lại: "Buổi này có học bù không? Nếu có thì bù vào ngày nào?"
+- Chỉ có 1 việc cần làm → dùng format action đơn như bình thường
 
 === LƯU Ý ===
 - Thiếu thông tin → action="answer", hỏi lại
