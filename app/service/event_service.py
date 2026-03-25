@@ -148,6 +148,19 @@ def create_events(events, creator_id):
     return docs
 
 
+def get_events(creator_id):
+    docs = list(event_collection.find({"creator_id": creator_id}))
+    return [mongo_to_dict(doc) for doc in docs]
+
+
+def get_event_by_id(event_id, creator_id):
+    doc = event_collection.find_one({
+        "_id": ObjectId(event_id),
+        "creator_id": creator_id
+    })
+    return mongo_to_dict(doc) if doc else None
+
+
 def get_weekly_schedule(creator_id: str, week_start_date: date_type = None):
     """
     Trả về lịch trong tuần theo thời gian thực, từ T2 đến CN.
