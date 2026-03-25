@@ -6,9 +6,8 @@ from app.router import auth, event, telegram, chat, gpa   # ✅ thêm gpa
 from app.bot.telegram_bot import build_bot
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.service.notification_service import send_upcoming_reminders
-from app.service.gpa_notification_service import (   # ✅ thêm
+from app.service.gpa_notification_service import (
     send_gpa_alerts,
-    send_weak_course_reminders,
     send_monthly_gpa_report,
 )
 
@@ -51,10 +50,7 @@ async def startup():
     # Cảnh báo GPA mỗi thứ Hai 8:00
     scheduler.add_job(send_gpa_alerts, "cron", day_of_week="mon", hour=8, minute=0)
  
-    # Nhắc môn tín chỉ cao đầu mỗi tháng (ngày 1, 8:30)
-    scheduler.add_job(send_weak_course_reminders, "cron", day=1, hour=8, minute=30)
- 
-    # ✅ Báo cáo GPA tháng — ngày 1 hàng tháng lúc 8:00
+    # ✅ Báo cáo GPA tháng — ngày 1 hàng tháng lúc 8:00 (gộp cả gợi ý môn yếu)
     scheduler.add_job(send_monthly_gpa_report, "cron", day=1, hour=8, minute=0)
  
     scheduler.start()

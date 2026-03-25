@@ -60,39 +60,7 @@ async def send_gpa_alerts():
             print(f"[GPA Alert] Lỗi gửi Telegram {student_id}: {e}")
 
 
-# ─────────────────────────────────────────
-# (CŨ) Nhắc môn tín chỉ cao đầu tháng
-# ─────────────────────────────────────────
-async def send_weak_course_reminders():
-    users = list(user_collection.find({"is_telegram_linked": True}))
-    for user in users:
-        student_id = user["student_id"]
-        chat_id    = user.get("telegram_chat_id")
-        if not chat_id:
-            continue
 
-        ctx     = get_gpa_context_for_ai(student_id)
-        weak    = ctx.get("weak_courses", [])
-        pending = ctx.get("pending_courses", [])[:3]
-
-        if not weak and not pending:
-            continue
-
-        lines = ["📚 *Gợi ý học kỳ này từ MindBot:*\n"]
-        if weak:
-            lines.append("🔴 *Môn nên học lại để cải thiện GPA:*")
-            for w in weak[:3]:
-                lines.append(f"  • {w.get('course_name')} — {w.get('letter')} ({w.get('credits')} TC)")
-        if pending:
-            lines.append("\n🟡 *Môn tín chỉ cao chưa hoàn thành:*")
-            for p in pending:
-                lines.append(f"  • {p['course_name']} ({p['credits']} TC)")
-        lines.append("\n💡 Ưu tiên các môn tín chỉ cao để cải thiện GPA hiệu quả nhất!")
-
-        try:
-            await bot.send_message(chat_id=chat_id, text="\n".join(lines), parse_mode="Markdown")
-        except Exception as e:
-            print(f"[Weak Reminder] Lỗi gửi Telegram {student_id}: {e}")
 
 
 # ─────────────────────────────────────────
@@ -205,6 +173,25 @@ async def send_monthly_gpa_report():
 
         needed_str = f"{needed}/4.0" if needed and needed <= 4.0 else ("Không thể đạt ❌" if needed else "Đã đạt ✅")
 
+        # Gợi ý môn yếu + môn chưa học (gộp từ send_weak_course_reminders)
+        ctx     = get_gpa_context_for_ai(student_id)
+        weak    = ctx.get("weak_courses", [])
+        pending = ctx.get("pending_courses", [])[:3]
+
+        suggestion_lines = []
+        if weak:
+            suggestion_lines.append("\n🔴 *Môn nên học lại:*")
+            for w in weak[:3]:
+                suggestion_lines.append(f"  • {w.get('course_name')} — {w.get('letter')} ({w.get('credits')} TC)")
+        if pending:
+            suggestion_lines.append("\n🟡 *Môn tín chỉ cao chưa hoàn thành:*")
+            for p in pending:
+                suggestion_lines.append(f"  • {p['course_name']} ({p['credits']} TC)")
+        if suggestion_lines:
+            suggestion_lines.append("\n💡 Ưu tiên môn tín chỉ cao để cải thiện GPA hiệu quả nhất!")
+
+        suggestion_block = "\n".join(suggestion_lines)
+
         message = (
             f"📋 *Báo cáo GPA tháng {month}*\n"
             f"━━━━━━━━━━━━━━━━━\n\n"
@@ -216,7 +203,8 @@ async def send_monthly_gpa_report():
             f"Đã hoàn thành : {completed}/{total} TC ({progress}%)\n"
             f"Còn lại       : {remaining} TC\n"
             f"Cần TB mỗi TC : {needed_str}\n\n"
-            f"🗓 Tháng này nhập : *{new_grades} môn*\n\n"
+            f"🗓 Tháng này nhập : *{new_grades} môn*"
+            f"{suggestion_block}\n\n"
             f"{'💪 Tiếp tục cố gắng để đạt mục tiêu!' if current < target else '🎉 Tuyệt vời! Duy trì phong độ nhé!'}"
         )
 

@@ -192,7 +192,7 @@ def handle_chat(message: str, student_id: str) -> dict:
 
     try:
         response = client.models.generate_content(
-            model="gemini-3-flash-preview ",
+            model="gemini-3-flash-preview",
             contents=prompt,
         )
         raw_text = response.text.strip()
