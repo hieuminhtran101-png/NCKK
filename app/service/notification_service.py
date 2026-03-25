@@ -1,41 +1,49 @@
 #app/service/notification_service.py
 from telegram import Bot
 from datetime import datetime, timedelta, timezone
-from app.core.database import event_collection, user_collection
+from app.core.database import user_collection
+from app.service.event_service import get_events_by_date
 import os
 
 bot = Bot(token=os.getenv("TELEGRAM_BOT_TOKEN"))
 
 async def send_upcoming_reminders():
-    tomorrow = datetime.now(timezone.utc) + timedelta(days=1)
-    tomorrow_start = tomorrow.replace(hour=0, minute=0, second=0, microsecond=0)
-    tomorrow_end   = tomorrow.replace(hour=23, minute=59, second=59, microsecond=0)
+    # Tính ngày mai theo giờ Việt Nam (UTC+7)
+    tomorrow = (datetime.now(timezone.utc) + timedelta(hours=7) + timedelta(days=1)).date()
+    tomorrow_str = tomorrow.strftime("%Y-%m-%d")
 
-    # Quét tất cả events ngày mai
-    events = list(event_collection.find({
-        "start_date": {"$gte": tomorrow_start, "$lte": tomorrow_end}
-    }))
+    users = list(user_collection.find({"is_telegram_linked": True}))
 
-    if not events:
-        return
-
-    for event in events:
-        # Tìm user theo student_id (khóa chính của bạn)
-        user = user_collection.find_one({"student_id": event["creator_id"]})
-
-        # Bỏ qua nếu chưa liên kết Telegram
-        if not user or not user.get("is_telegram_linked"):
+    for user in users:
+        student_id = user["student_id"]
+        chat_id    = user.get("telegram_chat_id")
+        if not chat_id:
             continue
 
-        await bot.send_message(
-            chat_id=user["telegram_chat_id"],
-            text=(
-                f"📚 *Nhắc nhở buổi học ngày mai!*\n\n"
-                f"📌 *{event['title']}*\n"
-                f"🏫 Phòng: `{event['room']}`\n"
-                f"👨‍🏫 Giáo viên: {event['teacher']}\n"
-                f"⏰ Tiết: {event['period_start']} - {event['period_end']}\n"
-                f"📅 Ngày: {event['start_date'].strftime('%d/%m/%Y')}"
-            ),
-            parse_mode="Markdown"
-        )
+        # Dùng đúng hàm đã có — tính cả skip_dates, extra_dates, day_of_week
+        events = get_events_by_date(creator_id=student_id, date=tomorrow_str)
+        if not events:
+            continue
+
+        lines = [f"📅 *Lịch học ngày mai ({tomorrow.strftime('%d/%m/%Y')})*\n Đại vương ơi"]
+        for event in events:
+            etype = event.get("event_type", "buoi_hoc")
+            EMOJI = {
+                "buoi_hoc": "📚", "thi": "📝", "deadline": "⏰",
+                "hop_nhom": "👥", "su_kien": "🎉"
+            }.get(etype, "📌")
+            lines.append(
+                f"{EMOJI} *{event['title']}*\n"
+                f"   🏫 Phòng: `{event['room']}`\n"
+                f"   👨‍🏫 GV: {event['teacher']}\n"
+                f"   ⏰ Tiết: {event['period_start']} - {event['period_end']}\n"
+            )
+
+        try:
+            await bot.send_message(
+                chat_id=chat_id,
+                text="\n".join(lines),
+                parse_mode="Markdown"
+            )
+        except Exception as e:
+            print(f"[Reminder] Lỗi gửi Telegram {student_id}: {e}")
