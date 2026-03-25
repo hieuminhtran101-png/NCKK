@@ -180,7 +180,8 @@ def handle_chat(message: str, student_id: str) -> dict:
     gpa_context    = get_gpa_context_for_ai(student_id)
     gpa_section    = build_gpa_section(gpa_context)
     gpa_actions    = build_gpa_actions_section(
-        pending_courses=gpa_context.get("pending_courses", [])
+        pending_courses=gpa_context.get("pending_courses", []),
+        all_courses=gpa_context.get("all_courses", [])
     )
 
     prompt = build_chat_prompt(
@@ -192,7 +193,7 @@ def handle_chat(message: str, student_id: str) -> dict:
 
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-2.5-flash-lite",
             contents=prompt,
         )
         raw_text = response.text.strip()

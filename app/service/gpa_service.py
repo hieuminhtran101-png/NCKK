@@ -326,9 +326,13 @@ def get_gpa_context_for_ai(student_id: str) -> dict:
     # Chỉ top 8 môn chưa học, tín chỉ cao nhất — AI không cần biết hết
     pending = get_pending_courses(student_id, limit=8)
 
+    # Thêm danh sách tất cả môn học để AI có thể ánh xạ tên môn
+    all_courses = list(course_collection.find({}, {"course_name": 1, "course_code": 1, "_id": 0}))
+
     return {
         "summary":         summary.model_dump() if summary else {},
         "grades":          grades,
         "weak_courses":    weak,
         "pending_courses": pending,
+        "all_courses":     all_courses,  # Thêm này
     }

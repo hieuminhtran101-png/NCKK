@@ -6,6 +6,37 @@ from bson import ObjectId
 
 WEEKDAY_MAP = {0: "T2", 1: "T3", 2: "T4", 3: "T5", 4: "T6", 5: "T7", 6: "CN"}
 
+# Mapping tiết học sang thời gian
+PERIOD_TIMES = {
+    "sáng": {
+        1: ("07:00", "07:50"),
+        2: ("08:00", "08:50"),
+        3: ("09:00", "09:50"),
+        4: ("10:00", "10:50"),
+        5: ("11:00", "11:50"),
+    },
+    "chiều": {
+        6: ("12:30", "13:20"),
+        7: ("13:30", "14:20"),
+        8: ("14:30", "15:20"),
+        9: ("15:30", "16:20"),
+        10: ("16:30", "17:20"),
+    },
+    "tối": {
+        11: ("18:00", "18:50"),
+        12: ("19:00", "19:50"),
+        13: ("20:00", "20:50"),
+        14: ("21:00", "21:50"),
+        15: ("22:00", "22:50"),
+    }
+}
+
+
+def convert_period_to_time(session: str, period: int) -> tuple[str, str]:
+    """Chuyển tiết học sang thời gian bắt đầu và kết thúc."""
+    times = PERIOD_TIMES.get(session, {})
+    return times.get(period, ("?", "?"))
+
 
 def _parse_date(date_str: str) -> datetime:
     return datetime.strptime(date_str, "%Y-%m-%d")
@@ -69,6 +100,25 @@ def create_events(events, creator_id):
     now  = datetime.now(timezone.utc)
     docs = []
     for e in events:
+        # Kiểm tra trùng lặp
+        existing = event_collection.find({
+            "creator_id": creator_id,
+            "day_of_week": e.day_of_week,
+            "session": e.session,
+            "$or": [
+                {"period_start": {"$lte": e.period_end, "$gte": e.period_start}},
+                {"period_end": {"$gte": e.period_start, "$lte": e.period_end}},
+                {"$and": [
+                    {"period_start": {"$lte": e.period_start}},
+                    {"period_end": {"$gte": e.period_end}}
+                ]}
+            ],
+            "start_date": {"$lte": _to_dt(e.end_date)},
+            "end_date": {"$gte": _to_dt(e.start_date)}
+        })
+        if list(existing):
+            raise ValueError(f"Trùng lịch: {e.title} vào {e.day_of_week} {e.session} tiết {e.period_start}-{e.period_end}")
+
         doc = {
             "title":        e.title,
             "room":         e.room,
@@ -98,9 +148,45 @@ def create_events(events, creator_id):
     return docs
 
 
-def get_events(creator_id):
-    docs = list(event_collection.find({"creator_id": creator_id}))
-    return [mongo_to_dict(doc) for doc in docs]
+def get_weekly_schedule(creator_id: str, week_start_date: date_type = None):
+    """
+    Trả về lịch trong tuần theo thời gian thực, từ T2 đến CN.
+    Mỗi ngày chia thành sáng, chiều, tối.
+    """
+    if not week_start_date:
+        today = datetime.now(timezone.utc).date()
+        week_start_date = today - timedelta(days=today.weekday())  # T2
+
+    week_end_date = week_start_date + timedelta(days=6)  # CN
+
+    # Lấy tất cả events trong khoảng thời gian
+    events = list(event_collection.find({
+        "creator_id": creator_id,
+        "start_date": {"$lte": _to_dt(week_end_date)},
+        "end_date": {"$gte": _to_dt(week_start_date)}
+    }))
+
+    schedule = {}
+    for i in range(7):  # T2 to CN
+        day = week_start_date + timedelta(days=i)
+        day_key = WEEKDAY_MAP[day.weekday()]
+        schedule[day_key] = {"date": day.isoformat(), "sessions": {"sáng": [], "chiều": [], "tối": []}}
+
+        for event in events:
+            if _event_occurs_on(event, day):
+                session = event["session"]
+                start_time, end_time = convert_period_to_time(session, event["period_start"])
+                schedule[day_key]["sessions"][session].append({
+                    "id": str(event["_id"]),
+                    "title": event["title"],
+                    "room": event["room"],
+                    "teacher": event["teacher"],
+                    "period": f"{event['period_start']}-{event['period_end']}",
+                    "time": f"{start_time}-{end_time}",
+                    "event_type": event["event_type"]
+                })
+
+    return schedule
 
 
 def get_event_by_id(event_id, creator_id):

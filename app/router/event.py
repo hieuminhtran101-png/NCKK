@@ -10,6 +10,7 @@ from app.service.event_service import (
     update_event, delete_event,
     add_skip_date, remove_skip_date,
     add_extra_date, remove_extra_date,
+    get_weekly_schedule,
 )
 
 router = APIRouter(prefix="/api/events", tags=["events"])
@@ -25,9 +26,15 @@ def create_event(
     return {"message": "Tạo sự kiện thành công", "data": events}
 
 
-@router.get("/")
-def list_events(student_id: str = Depends(get_current_user)):
-    return {"message": "OK", "data": get_events(creator_id=student_id)}
+@router.get("/weekly")
+def get_weekly_schedule_route(
+    week_start: str = None,
+    student_id: str = Depends(get_current_user),
+):
+    from datetime import date
+    week_start_date = date.fromisoformat(week_start) if week_start else None
+    schedule = get_weekly_schedule(creator_id=student_id, week_start_date=week_start_date)
+    return {"message": "OK", "data": schedule}
 
 
 @router.get("/{event_id}")

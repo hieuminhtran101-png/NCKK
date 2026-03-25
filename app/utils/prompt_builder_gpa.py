@@ -51,9 +51,13 @@ Trang thai        : {status_line}
 ================================""".strip()
 
 
-def build_gpa_actions_section(pending_courses: list = None) -> str:
+def build_gpa_actions_section(pending_courses: list = None, all_courses: list = None) -> str:
     course_lookup = ""
-    if pending_courses:
+    if all_courses:
+        course_lookup = "\nBANG TRA TAT CA MA MON (dung khi add_grade hoac tim mon):\n"
+        for c in all_courses:
+            course_lookup += f'  "{c["course_name"]}" -> course_code: "{c["course_code"]}"\n'
+    elif pending_courses:
         course_lookup = "\nBANG TRA MA MON (bat buoc dung khi add_grade):\n"
         for c in pending_courses:
             course_lookup += f'  "{c["course_name"]}" -> course_code: "{c["course_code"]}"\n'
@@ -85,16 +89,19 @@ PRESET: trung_binh=2.0 | kha=2.5 | gioi=3.2 | xuat_sac=3.6
 """
 
 # ==============================================================
-# PATCH ai_service.py — dòng 147, sửa 1 dòng duy nhất:
+# PATCH ai_service.py — dòng 180, sửa 1 dòng duy nhất:
 #
 # CŨ:
-#   gpa_actions = build_gpa_actions_section()
-#
-# MỚI:
 #   gpa_actions = build_gpa_actions_section(
 #       pending_courses=gpa_context.get("pending_courses", [])
 #   )
 #
-# Lý do: truyền danh sách môn chưa học vào để AI
+# MỚI:
+#   gpa_actions = build_gpa_actions_section(
+#       pending_courses=gpa_context.get("pending_courses", []),
+#       all_courses=gpa_context.get("all_courses", [])
+#   )
+#
+# Lý do: truyền danh sách tất cả môn học vào để AI
 # có bảng tra mã môn ngay trong prompt → không hallucinate tên môn
 # ==============================================================
