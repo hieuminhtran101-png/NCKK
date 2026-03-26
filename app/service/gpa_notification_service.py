@@ -107,9 +107,13 @@ async def send_gpa_alerts():
 # 2. Nhắc ngay khi GPA tụt sau lần nhập điểm
 # ─────────────────────────────────────────
 async def notify_gpa_drop(student_id: str, gpa_before: float, gpa_after: float, course_name: str):
-    if gpa_after >= gpa_before:
-        # GPA tăng hoặc giữ nguyên → gửi lời khen thay vì cảnh báo
+    if gpa_after > gpa_before:
+        # GPA tăng → gửi khen
         await notify_gpa_rise(student_id, gpa_before, gpa_after, course_name)
+        return
+
+    if gpa_after == gpa_before:
+        # GPA không đổi → không cần gửi báo động/khen
         return
 
     user = user_collection.find_one({"student_id": student_id})

@@ -199,8 +199,8 @@ def add_grade(student_id: str, data: StudentCourseCreate) -> Optional[dict]:
         }}
     )
  
-    # ✅ Trigger notify nếu GPA tụt — chạy async không block response
-    if gpa_after < gpa_before:
+    # ✅ Trigger notify khi GPA thay đổi (tăng/giảm) — chạy async không block response
+    if gpa_after != gpa_before:
         from app.service.gpa_notification_service import notify_gpa_drop
         try:
             loop = asyncio.get_event_loop()
