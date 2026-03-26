@@ -5,7 +5,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.router import auth, event, telegram, chat, gpa   # ✅ thêm gpa
 from app.bot.telegram_bot import build_bot
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from app.service.notification_service import send_upcoming_reminders
+from app.service.notification_service import (
+    send_upcoming_reminders,
+    send_evening_reminders,
+    send_1h_before_reminders,
+)
 from app.service.gpa_notification_service import (
     send_gpa_alerts,
     send_monthly_gpa_report,
@@ -44,8 +48,11 @@ async def startup():
     await telegram_app.start()
     await telegram_app.updater.start_polling()
  
-    # Nhắc lịch học hàng ngày lúc 14:20
-    scheduler.add_job(send_upcoming_reminders, "cron", hour=14, minute=20)
+    # Nhắc lịch học buổi tối 21:00
+    scheduler.add_job(send_evening_reminders, "cron", hour=21, minute=0)
+
+    # Nhắc 1 tiếng trước buổi học — chạy mỗi 30 phút
+    scheduler.add_job(send_1h_before_reminders, "cron", minute="0,30")
  
     # Cảnh báo GPA mỗi thứ Hai 8:00
     scheduler.add_job(send_gpa_alerts, "cron", day_of_week="mon", hour=8, minute=0)
