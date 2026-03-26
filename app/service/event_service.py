@@ -6,6 +6,31 @@ from bson import ObjectId
 
 WEEKDAY_MAP = {0: "T2", 1: "T3", 2: "T4", 3: "T5", 4: "T6", 5: "T7", 6: "CN"}
 
+PERIOD_TIME_MAP = {
+    1:  "07:00",
+    2:  "07:50",
+    3:  "08:40",
+    4:  "09:30",
+    5:  "10:20",
+    6:  "11:10",
+    7:  "12:30",
+    8:  "13:20",
+    9:  "14:10",
+    10: "15:00",
+    11: "15:50",
+    12: "16:40",
+    13: "18:00",
+    14: "18:50",
+    15: "19:40",
+}
+
+
+def convert_period_to_time(session: str, period_start: int, period_end: int) -> tuple[str, str]:
+    """Chuyển tiết bắt đầu/kết thúc → giờ thực."""
+    start = PERIOD_TIME_MAP.get(period_start, "??:??")
+    end   = PERIOD_TIME_MAP.get(period_end,   "??:??")
+    return start, end
+
 
 def _parse_date(date_str: str) -> datetime:
     return datetime.strptime(date_str, "%Y-%m-%d")
@@ -134,7 +159,7 @@ def get_weekly_schedule(creator_id: str, week_start_date: date_type = None):
         for event in events:
             if _event_occurs_on(event, day):
                 session = event["session"]
-                start_time, end_time = convert_period_to_time(session, event["period_start"])
+                start_time, end_time = convert_period_to_time(session, event["period_start"], event["period_end"])
                 schedule[day_key]["sessions"][session].append({
                     "id": str(event["_id"]),
                     "title": event["title"],
