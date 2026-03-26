@@ -1,7 +1,7 @@
 # app/service/gpa_service.py  — thêm các hàm mới, giữ nguyên các hàm cũ
 
 from app.core.database import db
-from app.schemas.gpa import StudentCourseCreate, StudentCourseUpdate, GpaSummary, GpaPreset
+from app.schemas.gpa import StudentCourseCreate, GpaSummary, GpaPreset
 from app.utils.mongo import mongo_to_dict
 from datetime import datetime, timezone
 from bson import ObjectId
@@ -157,9 +157,8 @@ def add_grade(student_id: str, data: StudentCourseCreate) -> Optional[dict]:
     letter, score_4 = _convert_score(data.score_10)
     now = datetime.now(timezone.utc)
  
-    # ✅ Lưu GPA trước khi lưu điểm để so sánh sau
-    user_before  = user_collection.find_one({"student_id": student_id})
-    gpa_before   = user_before.get("current_gpa", 0.0) if user_before else 0.0
+    user_before = user_collection.find_one({"student_id": student_id})
+    gpa_before  = user_before.get("current_gpa", 0.0) if user_before else 0.0
  
     existing = student_course_collection.find_one({
         "student_id":  student_id,
@@ -199,31 +198,30 @@ def add_grade(student_id: str, data: StudentCourseCreate) -> Optional[dict]:
         }}
     )
  
-    # ✅ Trigger notify khi GPA thay đổi (tăng/giảm) — chạy async không block response
-    if gpa_after != gpa_before:
-        from app.service.gpa_notification_service import notify_gpa_drop
+    # Luôn notify sau mỗi lần nhập/sửa điểm thành công
+    print(f"[DEBUG] add_grade done: student_id={student_id}, gpa_before={gpa_before}, gpa_after={gpa_after}")
+    from app.service.gpa_notification_service import notify_grade_saved
+
+    coro = notify_grade_saved(
+        student_id=student_id,
+        course_name=course.get("course_name", data.course_code),
+        score_10=data.score_10,
+        gpa_before=gpa_before,
+        gpa_after=gpa_after,
+    )
+
+    try:
+        loop = asyncio.get_running_loop()
+        if loop.is_running():
+            asyncio.create_task(coro)
+    except RuntimeError:
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # Trong FastAPI context — schedule coroutine
-                asyncio.ensure_future(notify_gpa_drop(
-                    student_id=student_id,
-                    gpa_before=gpa_before,
-                    gpa_after=gpa_after,
-                    course_name=course.get("course_name", data.course_code)
-                ))
-            else:
-                loop.run_until_complete(notify_gpa_drop(
-                    student_id=student_id,
-                    gpa_before=gpa_before,
-                    gpa_after=gpa_after,
-                    course_name=course.get("course_name", data.course_code)
-                ))
+            asyncio.run(coro)
         except Exception as e:
-            print(f"[notify_gpa_drop] {e}")  # không block dù notify lỗi
+            print(f"[notify_grade_saved] failed: {e}")
  
     return mongo_to_dict(doc)
- 
+
 
 def get_grades(student_id: str, semester: Optional[str] = None) -> list:
     query = {"student_id": student_id}

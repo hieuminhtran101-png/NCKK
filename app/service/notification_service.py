@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from app.core.database import user_collection
 from app.service.event_service import get_events_by_date, PERIOD_TIME_MAP
 import os
+import random
 
 bot = Bot(token=os.getenv("TELEGRAM_BOT_TOKEN"))
 
@@ -20,6 +21,33 @@ def _get_start_time(period_start: int) -> str:
 
 def _get_end_time(period_end: int) -> str:
     return PERIOD_TIME_MAP.get(period_end, "??:??")
+
+
+def _random_evening_reminder() -> str:
+    styles = [
+        [
+            "🌙 Mai có lịch học rồi đó nha!",
+            "📚 Nhớ chuẩn bị bài trước khi ngủ nhé!",
+            "💤 Ngủ sớm để mai học hiệu quả hơn!",
+        ],
+        [
+            "🚀 Mai là một ngày tiến gần mục tiêu hơn!",
+            "📖 Chuẩn bị sẵn sàng — đừng để bị 'úp sọt' trên lớp 😏",
+            "💪 Kỷ luật hôm nay = GPA đẹp ngày mai",
+        ],
+        [
+            "🧠 Não: 'ngủ đi' — Deadline: 'không 🙂'",
+            "📚 Mai học rồi đó, đừng giả vờ quên nha!",
+            "😴 Ngủ sớm đi, đừng để sáng mai thành zombie",
+        ],
+        [
+            "📌 Lịch học ngày mai đã sẵn sàng",
+            "📚 Hãy chuẩn bị kỹ để tối đa hiệu quả buổi học",
+            "⏰ Đúng giờ — đúng việc — đúng mục tiêu",
+        ],
+    ]
+    chosen = random.choice(styles)
+    return "\n".join(chosen)
 
 def _format_event_block(event: dict) -> str:
     etype      = event.get("event_type", "buoi_hoc")
@@ -61,6 +89,8 @@ async def send_evening_reminders():
         for event in events:
             lines.append(_format_event_block(event))
         lines.append("💤 Ngủ sớm để học tốt nhé!")
+        lines.append("")
+        lines.append(_random_evening_reminder())
 
         try:
             await bot.send_message(chat_id=chat_id, text="\n".join(lines), parse_mode="Markdown")

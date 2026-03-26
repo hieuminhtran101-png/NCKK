@@ -43,10 +43,15 @@ def _to_dt(d) -> datetime:
     return datetime.combine(d, datetime.min.time())
 
 
+def _now_vn():
+    """Trả về datetime hiện tại theo giờ Việt Nam (UTC+7)."""
+    return datetime.now(timezone.utc) + timedelta(hours=7)
+
+
 # ─────────────────────────────────────────
 # Core logic: kiểm tra event có xảy ra vào ngày target không
 # ─────────────────────────────────────────
-def _event_occurs_on(doc: dict, target: datetime) -> bool:
+def _event_occurs_on(doc: dict, target) -> bool:
     """
     Ưu tiên:
     1. extra_dates có target → CÓ học (dù là ngày bù)
@@ -105,7 +110,6 @@ def create_events(events, creator_id):
             "start_date":   _to_dt(e.start_date),
             "end_date":     _to_dt(e.end_date),
             "event_type":   e.event_type.value,
-            # ✅ lưu skip/extra dưới dạng datetime để nhất quán với MongoDB
             "skip_dates":   [_to_dt(d) for d in (e.skip_dates or [])],
             "extra_dates":  [_to_dt(d) for d in (e.extra_dates or [])],
             "creator_id":   creator_id,
@@ -136,49 +140,80 @@ def get_event_by_id(event_id, creator_id):
     return mongo_to_dict(doc) if doc else None
 
 
-def get_weekly_schedule(creator_id: str, week_start_date: date_type = None):
-    if not week_start_date:
-        today = (datetime.now(timezone.utc) + timedelta(hours=7)).date()  # ✅ fix UTC+7
-        week_start_date = today - timedelta(days=today.weekday())
+def get_weekly_schedule(creator_id: str, week_offset: int = 0):
+    """
+    Trả về lịch học theo tuần.
 
-    week_end_date = week_start_date + timedelta(days=6)  # CN
+    Args:
+        creator_id:  ID người dùng
+        week_offset: 0 = tuần này (default), 1 = tuần sau, -1 = tuần trước, ...
+    """
+    today           = _now_vn().date()
+    week_start_date = today - timedelta(days=today.weekday()) + timedelta(weeks=week_offset)
+    week_end_date   = week_start_date + timedelta(days=6)
 
-    # Lấy tất cả events trong khoảng thời gian
     events = list(event_collection.find({
         "creator_id": creator_id,
-        "start_date": {"$lte": _to_dt(week_end_date)},
-        "end_date": {"$gte": _to_dt(week_start_date)}
+        "$or": [
+            {
+                "start_date": {"$lte": _to_dt(week_end_date)},
+                "end_date":   {"$gte": _to_dt(week_start_date)},
+            },
+            {
+                "extra_dates": {"$elemMatch": {
+                    "$gte": _to_dt(week_start_date),
+                    "$lte": _to_dt(week_end_date),
+                }}
+            },
+        ]
     }))
 
     schedule = {}
-    for i in range(7):  # T2 to CN
-        day = week_start_date + timedelta(days=i)
+    for i in range(7):  # T2 → CN
+        day     = week_start_date + timedelta(days=i)
         day_key = WEEKDAY_MAP[day.weekday()]
-        schedule[day_key] = {"date": day.isoformat(), "sessions": {"sáng": [], "chiều": [], "tối": []}}
+        schedule[day_key] = {
+            "date":     day.isoformat(),
+            "is_today": day == today,
+            "sessions": {"sáng": [], "chiều": [], "tối": []},
+        }
 
         for event in events:
-            if _event_occurs_on(event, day):
-                session = event["session"]
-                start_time, end_time = convert_period_to_time(session, event["period_start"], event["period_end"])
-                schedule[day_key]["sessions"][session].append({
-                    "id": str(event["_id"]),
-                    "title": event["title"],
-                    "room": event["room"],
-                    "teacher": event["teacher"],
-                    "period": f"{event['period_start']}-{event['period_end']}",
-                    "time": f"{start_time}-{end_time}",
-                    "event_type": event["event_type"]
-                })
+            if not _event_occurs_on(event, day):
+                continue
 
-    return schedule
+            session = str(event.get("session", "")).strip().lower()
+            session_map = {
+                "sang": "sáng", "sáng": "sáng",
+                "chieu": "chiều", "chiều": "chiều",
+                "toi": "tối", "tối": "tối",
+            }
+            session_normalized = session_map.get(session)
+            if not session_normalized:
+                continue
 
+            start_time, end_time = convert_period_to_time(
+                session_normalized,
+                event.get("period_start"),
+                event.get("period_end"),
+            )
+            schedule[day_key]["sessions"][session_normalized].append({
+                "id":         str(event.get("_id")),
+                "title":      event.get("title"),
+                "room":       event.get("room"),
+                "teacher":    event.get("teacher"),
+                "period":     f"{event.get('period_start')}-{event.get('period_end')}",
+                "time":       f"{start_time}-{end_time}",
+                "event_type": event.get("event_type"),
+            })
 
-def get_event_by_id(event_id, creator_id):
-    doc = event_collection.find_one({
-        "_id": ObjectId(event_id),
-        "creator_id": creator_id
-    })
-    return mongo_to_dict(doc) if doc else None
+    return {
+        "week_offset":  week_offset,
+        "week_start":   week_start_date.isoformat(),
+        "week_end":     week_end_date.isoformat(),
+        "today":        today.isoformat(),
+        "schedule":     schedule,
+    }
 
 
 def update_event(event_id, data, creator_id):
@@ -191,7 +226,6 @@ def update_event(event_id, data, creator_id):
     if "event_type" in update_fields and hasattr(update_fields["event_type"], "value"):
         update_fields["event_type"] = update_fields["event_type"].value
 
-    # Chuyển skip/extra sang datetime nếu có
     for field in ("skip_dates", "extra_dates"):
         if field in update_fields and update_fields[field]:
             update_fields[field] = [_to_dt(d) for d in update_fields[field]]
@@ -267,12 +301,9 @@ def remove_extra_date(event_id: str, extra_date, creator_id: str) -> bool:
 
 def get_events_by_date(creator_id: str, date: str):
     """Lấy event xảy ra vào ngày cụ thể — tính cả skip/extra."""
-    target = _parse_date(date)
-
-    # Lấy rộng từ DB: events có thể xảy ra hôm đó
-    # (trong khoảng start–end HOẶC có trong extra_dates)
+    target      = _parse_date(date)
     day_of_week = WEEKDAY_MAP[target.weekday()]
-    candidates = list(event_collection.find({
+    candidates  = list(event_collection.find({
         "creator_id": creator_id,
         "$or": [
             {
@@ -284,7 +315,6 @@ def get_events_by_date(creator_id: str, date: str):
         ]
     }))
 
-    # Filter chính xác bằng logic ưu tiên
     result = [doc for doc in candidates if _event_occurs_on(doc, target)]
     return [mongo_to_dict(doc) for doc in result]
 
@@ -294,14 +324,12 @@ def get_events_by_range(creator_id: str, start_date: str, end_date: str):
     start = _parse_date(start_date)
     end   = _parse_date(end_date)
 
-    # Tập hợp tất cả thứ trong khoảng
     days_in_range = set()
     cur = start
     while cur <= end:
         days_in_range.add(WEEKDAY_MAP[cur.weekday()])
         cur += timedelta(days=1)
 
-    # Lấy rộng từ DB
     candidates = list(event_collection.find({
         "creator_id": creator_id,
         "$or": [
@@ -316,7 +344,6 @@ def get_events_by_range(creator_id: str, start_date: str, end_date: str):
         ]
     }))
 
-    # Filter từng ngày trong khoảng
     result_set = set()
     result     = []
     cur = start
@@ -341,7 +368,8 @@ def get_events_by_day_of_week(creator_id: str, day_of_week: str):
 
 def get_upcoming_events(creator_id: str, days: int = 7):
     """Lấy event sắp tới — tính cả skip/extra."""
-    now   = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    # ✅ Fix: dùng UTC+7 thay vì giờ máy chủ
+    now   = _now_vn().replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
     until = now + timedelta(days=days)
 
     days_in_range = set()
@@ -364,7 +392,6 @@ def get_upcoming_events(creator_id: str, days: int = 7):
         ]
     }).sort("start_date", 1))
 
-    # Expand từng ngày để sort đúng theo ngày xảy ra
     occurrences = []
     cur = now
     while cur <= until:

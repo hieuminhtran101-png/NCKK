@@ -49,7 +49,7 @@ async def startup():
     await telegram_app.updater.start_polling()
  
     # Nhắc lịch học buổi tối 21:00
-    scheduler.add_job(send_evening_reminders, "cron", hour=21, minute=0)
+    scheduler.add_job(send_evening_reminders, "cron", hour=23, minute=31)
 
     # Nhắc 1 tiếng trước buổi học — chạy mỗi 30 phút
     scheduler.add_job(send_1h_before_reminders, "cron", minute="0,30")

@@ -1,7 +1,5 @@
 # app/router/event.py
-from fastapi import APIRouter, HTTPException, Depends
-from datetime import date
-from typing import Optional
+from fastapi import APIRouter, HTTPException, Depends, Query
 from app.core.deps import get_current_user
 from app.schemas.events import (
     EventBulkCreate, EventUpdate,
@@ -32,16 +30,24 @@ def create_event(
 def list_events(student_id: str = Depends(get_current_user)):
     return {"message": "OK", "data": get_events(creator_id=student_id)}
 
+
 @router.get("/schedule/weekly")
 def weekly_schedule(
-    week_start: Optional[date] = None,
+    week_offset: int = Query(
+        default=0,
+        description="0 = tuần này (mặc định), 1 = tuần sau, -1 = tuần trước",
+    ),
     student_id: str = Depends(get_current_user),
 ):
-    schedule = get_weekly_schedule(
-        creator_id=student_id,
-        week_start_date=week_start
-    )
-    return {"message": "OK", "data": schedule}
+    """
+    Trả về lịch học theo tuần.
+    - `week_offset=0`  → tuần hiện tại
+    - `week_offset=1`  → tuần tới
+    - `week_offset=-1` → tuần trước
+    """
+    data = get_weekly_schedule(creator_id=student_id, week_offset=week_offset)
+    return {"message": "OK", "data": data}
+
 
 @router.get("/{event_id}")
 def get_event(
