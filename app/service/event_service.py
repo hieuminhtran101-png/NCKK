@@ -112,13 +112,9 @@ def get_event_by_id(event_id, creator_id):
 
 
 def get_weekly_schedule(creator_id: str, week_start_date: date_type = None):
-    """
-    Trả về lịch trong tuần theo thời gian thực, từ T2 đến CN.
-    Mỗi ngày chia thành sáng, chiều, tối.
-    """
     if not week_start_date:
-        today = datetime.now(timezone.utc).date()
-        week_start_date = today - timedelta(days=today.weekday())  # T2
+        today = (datetime.now(timezone.utc) + timedelta(hours=7)).date()  # ✅ fix UTC+7
+        week_start_date = today - timedelta(days=today.weekday())
 
     week_end_date = week_start_date + timedelta(days=6)  # CN
 

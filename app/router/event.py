@@ -1,11 +1,14 @@
 # app/router/event.py
 from fastapi import APIRouter, HTTPException, Depends
+from datetime import date
+from typing import Optional
 from app.core.deps import get_current_user
 from app.schemas.events import (
     EventBulkCreate, EventUpdate,
     EventAddSkip, EventAddExtra,
 )
 from app.service.event_service import (
+    get_weekly_schedule,
     create_events, get_events, get_event_by_id,
     update_event, delete_event,
     add_skip_date, remove_skip_date,
@@ -29,6 +32,16 @@ def create_event(
 def list_events(student_id: str = Depends(get_current_user)):
     return {"message": "OK", "data": get_events(creator_id=student_id)}
 
+@router.get("/schedule/weekly")
+def weekly_schedule(
+    week_start: Optional[date] = None,
+    student_id: str = Depends(get_current_user),
+):
+    schedule = get_weekly_schedule(
+        creator_id=student_id,
+        week_start_date=week_start
+    )
+    return {"message": "OK", "data": schedule}
 
 @router.get("/{event_id}")
 def get_event(
