@@ -54,13 +54,15 @@ def _now_vn():
 def _event_occurs_on(doc: dict, target) -> bool:
     """
     Ưu tiên:
-    1. extra_dates có target → CÓ học (dù là ngày bù)
-    2. skip_dates có target  → KHÔNG học (nghỉ bất thường)
-    3. day_of_week khớp + trong khoảng start–end → học bình thường
+    1. extra_dates có target → CÓ xảy ra
+    2. skip_dates có target  → KHÔNG xảy ra
+    3a. ONE-TIME (thi, deadline, su_kien): nằm trong start–end là đủ
+    3b. RECURRING (buoi_hoc, hop_nhom): đúng thứ + trong khoảng start–end
     """
+    ONE_TIME_TYPES = {"thi", "deadline", "su_kien"}
+
     target_date = target.date() if isinstance(target, datetime) else target
 
-    # Chuẩn hoá extra_dates và skip_dates từ DB (có thể là datetime hoặc date)
     def to_date(v):
         if isinstance(v, datetime):
             return v.date()
@@ -71,15 +73,11 @@ def _event_occurs_on(doc: dict, target) -> bool:
     extra = [to_date(d) for d in doc.get("extra_dates", []) if d]
     skip  = [to_date(d) for d in doc.get("skip_dates", []) if d]
 
-    # 1. Ưu tiên cao nhất: ngày học bù
     if target_date in extra:
         return True
-
-    # 2. Ngày nghỉ
     if target_date in skip:
         return False
 
-    # 3. Lịch thường: đúng thứ + trong khoảng
     start = doc["start_date"]
     end   = doc["end_date"]
     start_date = start.date() if isinstance(start, datetime) else start
@@ -87,6 +85,10 @@ def _event_occurs_on(doc: dict, target) -> bool:
 
     if not (start_date <= target_date <= end_date):
         return False
+
+    event_type = doc.get("event_type", "buoi_hoc")
+    if event_type in ONE_TIME_TYPES:
+        return True
 
     return WEEKDAY_MAP[target_date.weekday()] == doc.get("day_of_week", "")
 
@@ -306,11 +308,20 @@ def get_events_by_date(creator_id: str, date: str):
     candidates  = list(event_collection.find({
         "creator_id": creator_id,
         "$or": [
+            # RECURRING: phải đúng thứ
             {
                 "start_date":  {"$lte": target},
                 "end_date":    {"$gte": target},
                 "day_of_week": day_of_week,
+                "event_type":  {"$in": ["buoi_hoc", "hop_nhom"]},
             },
+            # ONE-TIME: chỉ cần nằm trong khoảng ngày
+            {
+                "start_date": {"$lte": target},
+                "end_date":   {"$gte": target},
+                "event_type": {"$in": ["thi", "deadline", "su_kien"]},
+            },
+            # Extra dates: ưu tiên cao nhất, áp dụng mọi loại
             {"extra_dates": target},
         ]
     }))
@@ -333,11 +344,20 @@ def get_events_by_range(creator_id: str, start_date: str, end_date: str):
     candidates = list(event_collection.find({
         "creator_id": creator_id,
         "$or": [
+            # RECURRING: phải đúng thứ nằm trong range
             {
                 "start_date":  {"$lte": end},
                 "end_date":    {"$gte": start},
                 "day_of_week": {"$in": list(days_in_range)},
+                "event_type":  {"$in": ["buoi_hoc", "hop_nhom"]},
             },
+            # ONE-TIME: chỉ cần overlap khoảng ngày
+            {
+                "start_date": {"$lte": end},
+                "end_date":   {"$gte": start},
+                "event_type": {"$in": ["thi", "deadline", "su_kien"]},
+            },
+            # Extra dates
             {
                 "extra_dates": {"$elemMatch": {"$gte": start, "$lte": end}}
             },
@@ -381,11 +401,20 @@ def get_upcoming_events(creator_id: str, days: int = 7):
     candidates = list(event_collection.find({
         "creator_id": creator_id,
         "$or": [
+            # RECURRING: phải đúng thứ
             {
                 "start_date":  {"$lte": until},
                 "end_date":    {"$gte": now},
                 "day_of_week": {"$in": list(days_in_range)},
+                "event_type":  {"$in": ["buoi_hoc", "hop_nhom"]},
             },
+            # ONE-TIME: chỉ cần overlap khoảng ngày
+            {
+                "start_date": {"$lte": until},
+                "end_date":   {"$gte": now},
+                "event_type": {"$in": ["thi", "deadline", "su_kien"]},
+            },
+            # Extra dates
             {
                 "extra_dates": {"$elemMatch": {"$gte": now, "$lte": until}}
             },
