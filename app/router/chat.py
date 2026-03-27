@@ -15,7 +15,7 @@ def chat(
     if not data.message.strip():
         raise HTTPException(status_code=400, detail="Tin nhắn không được để trống")
 
-    result = handle_chat(message=data.message, student_id=student_id)
+    result = handle_chat(message=data.message, student_id=student_id, history=data.history)
 
     return ChatResponse(
         reply=result["reply"],

@@ -107,9 +107,14 @@ def _dispatch(action: str, params: dict, student_id: str):
         return get_upcoming_events(creator_id=student_id, days=params.get("days", 7))
 
     elif action == "add_grade":
+        from app.service.gpa_service import course_collection
+        course_code = params.get("course_code")
+        course = course_collection.find_one({"course_code": course_code})
         return {
             "pending_confirm": True,
-            "course_code":     params.get("course_code"),
+            "course_code":     course_code,
+            "course_name":     course.get("course_name", course_code) if course else course_code,
+            "credits":         course.get("credits") if course else None,
             "score_10":        params.get("score_10"),
             "semester":        params.get("semester"),
         }
@@ -175,7 +180,13 @@ def _dispatch_many(actions: list, student_id: str) -> list:
 # =============================================
 # Hàm chính
 # =============================================
-def handle_chat(message: str, student_id: str) -> dict:
+def handle_chat(message: str, student_id: str, history: list = None) -> dict:
+    """
+    history: list[{"role": "user"|"model", "parts": [{"text": "..."}]}]
+    Truyền từ FE xuống để Gemini đọc được context đa lượt.
+    """
+    from app.utils.prompt_builder import build_system_prompt, build_user_turn
+
     current_events = get_events(creator_id=student_id)
     gpa_context    = get_gpa_context_for_ai(student_id)
     gpa_section    = build_gpa_section(gpa_context)
@@ -184,17 +195,32 @@ def handle_chat(message: str, student_id: str) -> dict:
         all_courses=gpa_context.get("all_courses", [])
     )
 
-    prompt = build_chat_prompt(
-        message=message,
+    system_prompt = build_system_prompt(
         events=current_events,
         gpa_section=gpa_section,
         gpa_actions=gpa_actions,
     )
 
+    # Build contents: history (nếu có) + tin nhắn mới nhất
+    contents = []
+    if history:
+        for turn in history:
+            role  = turn.get("role", "user")
+            parts = turn.get("parts", [])
+            # Chỉ giữ text, bỏ các part không phải text
+            text_parts = [p for p in parts if isinstance(p, dict) and "text" in p]
+            if text_parts:
+                contents.append({"role": role, "parts": text_parts})
+
+    contents.append({"role": "user", "parts": [{"text": build_user_turn(message)}]})
+
     try:
         response = client.models.generate_content(
             model="gemini-2.5-flash",
-            contents=prompt,
+            contents=contents,
+            config={
+                "system_instruction": system_prompt,
+            },
         )
         raw_text = response.text.strip()
     except Exception as e:
