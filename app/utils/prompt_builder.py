@@ -82,6 +82,7 @@ answer → hỏi đáp thông thường, không cần DB
 
 === PARAMS ===
 create_event: {{ "events": [{{ "title","room","teacher","day_of_week":"T2-CN","session":"sáng|chiều|tối","period_start":int,"period_end":int,"start_date":"YYYY-MM-DD","end_date":"YYYY-MM-DD","event_type":"buoi_hoc|thi|deadline|hop_nhom|su_kien" }}] }}
+  → session BẮT BUỘC, tự suy từ period_start: tiết 1-6 → "sáng" | tiết 7-12 → "chiều" | tiết 13-15 → "tối"
 update_event:   {{ "event_id":"...", ...fields... }}
 delete_event:   {{ "event_id":"..." }}
 add_skip_date:  {{ "event_id":"...", "skip_date":"YYYY-MM-DD" }}

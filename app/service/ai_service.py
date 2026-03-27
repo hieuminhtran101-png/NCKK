@@ -57,6 +57,13 @@ def _dispatch(action: str, params: dict, student_id: str):
 
     if action == "create_event":
         raw_events = params.get("events", [])
+        # Tự derive session nếu AI quên truyền
+        def _derive_session(e: dict) -> dict:
+            if not e.get("session"):
+                p = e.get("period_start", 1)
+                e["session"] = "sáng" if p <= 6 else "chiều" if p <= 12 else "tối"
+            return e
+        raw_events = [_derive_session(e) for e in raw_events]
         event_objects = [EventCreate(**e) for e in raw_events]
         return create_events(event_objects, creator_id=student_id)
 
